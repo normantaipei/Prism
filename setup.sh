@@ -18,4 +18,4 @@ mkdir -p logs
 
 echo
 echo "✅ 安裝完成。"
-echo "   測試：./run.sh ~/mnt/PhotoLibrary/2026_09_27_旭cos --limit 5"
+echo "   測試：./run.sh ~/mnt/PhotoLibrary/<某個拍攝資料夾> --limit 5"

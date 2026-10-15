@@ -34,13 +34,13 @@ password=你的NAS密碼
 
 ```bash
 # 先看標籤品質，不寫檔
-./run.sh ~/mnt/PhotoLibrary/2026_09_27_旭cos --limit 5
+./run.sh ~/mnt/PhotoLibrary/<某個拍攝資料夾> --limit 5
 
 # 滿意後實際寫入 JPG
-./run.sh ~/mnt/PhotoLibrary/2026_09_27_旭cos --write
+./run.sh ~/mnt/PhotoLibrary/<某個拍攝資料夾> --write
 
 # RAW 也要：先用 sidecar 測 Synology Photos 讀不讀 .xmp
-./run.sh ~/mnt/PhotoLibrary/2026_09_27_旭cos --write --raw-mode sidecar
+./run.sh ~/mnt/PhotoLibrary/<某個拍攝資料夾> --write --raw-mode sidecar
 ```
 
 | 參數 | 說明 |
