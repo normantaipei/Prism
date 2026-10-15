@@ -55,9 +55,9 @@ def db_init():
     return con
 
 
-def db_seen(con, p: Path, written_only: bool) -> bool:
+def db_seen(con, p: Path, written_only: bool, st=None) -> bool:
     """同路徑、同大小、同 mtime 視為已處理（寫入會改 mtime，所以寫過後也會更新紀錄）。"""
-    st = p.stat()
+    st = st or p.stat()
     row = con.execute("SELECT size, mtime, written FROM processed WHERE path=?", (str(p),)).fetchone()
     if not row:
         return False
@@ -77,20 +77,38 @@ def db_mark(con, p: Path, tags, aesthetic, written: bool):
 # ---------- 檔案列舉 ----------
 
 def iter_images(root: Path):
-    files = []
-    for p in sorted(root.rglob("*")):
-        if any(part in SKIP_DIRS for part in p.parts):
+    """用 os.scandir 逐目錄串流列出圖片，不先把整棵樹讀完。
+    scandir 一次目錄只要一次網路來回，而且 entry 自帶 is_file / stat 快取，
+    對 SMB 上幾萬張的資料夾比 rglob + 逐檔 stat 快一個數量級。"""
+    import os
+    stack = [root]
+    while stack:
+        d = stack.pop()
+        try:
+            with os.scandir(d) as it:
+                entries = sorted(it, key=lambda e: e.name)
+        except OSError as e:
+            print(f"  略過 {d}: {e}", file=sys.stderr)
             continue
-        if not p.is_file() or p.name.endswith("_original") or p.name.startswith("."):
-            continue
-        ext = p.suffix.lower()
-        if ext in IMAGE_EXT:
-            files.append(p)
-        elif ext in RAW_EXT:
-            # RAW 沒有同名 JPG 才直接分析 RAW
-            if not any(p.with_suffix(e).exists() for e in (".jpg", ".JPG", ".jpeg", ".JPEG")):
-                files.append(p)
-    return files
+        names = {e.name for e in entries}
+        subdirs = []
+        for e in entries:
+            if e.name in SKIP_DIRS or e.name.startswith("."):
+                continue
+            if e.is_dir(follow_symlinks=False):
+                subdirs.append(Path(e.path))
+                continue
+            if not e.is_file(follow_symlinks=False) or e.name.endswith("_original"):
+                continue
+            stem, ext = os.path.splitext(e.name)
+            ext = ext.lower()
+            if ext in IMAGE_EXT:
+                yield Path(e.path), e.stat()
+            elif ext in RAW_EXT:
+                # 同目錄已有同名 JPG 就不分析 RAW（用剛列出的名稱判斷，不再 stat）
+                if not any((stem + j) in names for j in (".jpg", ".JPG", ".jpeg", ".JPEG")):
+                    yield Path(e.path), e.stat()
+        stack.extend(reversed(subdirs))  # 保持字母序
 
 
 def sibling_raws(p: Path):
@@ -259,24 +277,37 @@ def main():
     con = db_init()
     tag_map = load_tag_map()
     missing_zh = set()
-    files = iter_images(root)
-    if not args.force:
-        before = len(files)
-        files = [p for p in files if not db_seen(con, p, written_only=args.write)]
-        skipped = before - len(files)
+    mode = "（會寫入）" if args.write else "（只印出）"
+    print(f"開始掃描 {root} {mode}，邊掃邊處理…\n", file=sys.stderr)
+
+    def pending():
+        """串流產生要處理的檔案，順便印掃描進度。"""
+        seen = skipped = 0
+        last = time.time()
+        for p, st in iter_images(root):
+            seen += 1
+            if not args.force and db_seen(con, p, written_only=args.write, st=st):
+                skipped += 1
+                if time.time() - last > 2:
+                    print(f"  掃描中… 已看 {seen} 張，跳過 {skipped} 張已處理", file=sys.stderr)
+                    last = time.time()
+                continue
+            yield p
         if skipped:
-            print(f"跳過 {skipped} 張已處理", file=sys.stderr)
+            print(f"\n掃描完成：共 {seen} 張，跳過 {skipped} 張已處理", file=sys.stderr)
+
+    files = pending()
     if args.limit:
-        files = files[: args.limit]
-    print(f"共 {len(files)} 張要分析{'（會寫入）' if args.write else '（只印出）'}\n", file=sys.stderr)
+        import itertools
+        files = itertools.islice(files, args.limit)
 
     results = []
     t0 = time.time()
-    for i, p in enumerate(files, 1):
+    for i, p in enumerate(files, 1):  # files 是 generator，總數未知
         try:
             labels, score, utility = analyze(p, args.min_conf, args.top)
         except Exception as e:
-            print(f"[{i}/{len(files)}] {p.name}  分析失敗: {e}", file=sys.stderr)
+            print(f"[{i}] {p.name}  分析失敗: {e}", file=sys.stderr)
             continue
 
         en_tags = [l for l, _ in labels]
@@ -288,7 +319,7 @@ def main():
         results.append(rec)
 
         if not args.json:
-            print(f"[{i}/{len(files)}] {p.name}")
+            print(f"[{i}] {p.name}")
             if score is not None:
                 st = score_to_stars(score, thresholds)
                 print(f"    美學 {score:+.2f}  {'★' * st}{'☆' * (5 - st)}{'  (工具照)' if utility else ''}")
