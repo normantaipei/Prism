@@ -1,0 +1,1 @@
+pyobjc-framework-Vision>=10.0
