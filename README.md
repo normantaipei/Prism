@@ -2,9 +2,21 @@
 
 把照片丟進去，分出標籤和評分。
 
-用 macOS 內建 Vision framework 幫 Synology NAS 上的照片自動加標籤。
-零 API 費用，全部在 Mac 本機跑；標籤寫進檔案的 IPTC/XMP 關鍵字，
-Synology Photos 會自動索引（已實測：寫入後幾分鐘內可搜尋到）。
+**只要有一台 Mac，就能讓任何第三方相簿擁有和 Apple「照片」一樣的自動分類能力，而且不花一毛 token 費用。**
+
+Apple 照片 App 之所以能自動認出「海邊」「貓」「生日蛋糕」，靠的是 macOS 內建的 Vision framework。
+這套模型其實是公開 API，任何程式都能呼叫，只是沒人把它接到 NAS 相簿上。
+Prism 做的就是這件事：掛載你的 NAS 照片資料夾 → 用 Vision 跑分類與美學評分 → 把結果寫進照片本身的
+IPTC/XMP metadata。Synology Photos、Immich、Lightroom、digiKam……任何讀標準 metadata 的相簿都能直接搜到。
+
+- **零成本**：不呼叫任何雲端 AI，所有運算在你的 Mac 上完成，M 系列晶片一張約 0.1 秒
+- **照片不出門**：不上傳任何東西，對 cosplay、人像這類有肖像權考量的照片特別重要
+- **標籤跟著檔案走**：寫在 metadata 裡，換 NAS、換相簿軟體都不會丟
+- **中英雙語**：內建 Vision 全部 1303 個標籤的繁體中文對照，中文搜尋也找得到
+- **美學評分 → 星等**：Vision 的美學分數轉成 1~5 星寫進 `XMP:Rating`，廢片一鍵篩掉
+
+目前以 Synology Photos 為主要目標實測（寫入後幾分鐘內可搜尋到，不需手動重建索引），
+但只要相簿會讀 IPTC Keywords / XMP Subject / XMP Rating，就能用。
 
 ## 架構
 
