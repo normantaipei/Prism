@@ -25,6 +25,7 @@ import time
 from pathlib import Path
 
 try:
+    import objc
     import Vision
     from Foundation import NSURL
 except ImportError:
@@ -123,35 +124,40 @@ def sibling_raws(p: Path):
 # ---------- Vision ----------
 
 def analyze(path: Path, min_conf: float, top_n: int):
-    url = NSURL.fileURLWithPath_(str(path))
-    handler = Vision.VNImageRequestHandler.alloc().initWithURL_options_(url, None)
+    # 每張圖一個 autorelease pool：pyobjc 在長迴圈裡不會自動釋放 ObjC 物件，
+    # VNImageRequestHandler 開的檔案 handle 會一直累積，幾千張後 "Too many open files"。
+    with objc.autorelease_pool():
+        url = NSURL.fileURLWithPath_(str(path))
+        handler = Vision.VNImageRequestHandler.alloc().initWithURL_options_(url, None)
 
-    classify = Vision.VNClassifyImageRequest.alloc().init()
-    requests = [classify]
+        classify = Vision.VNClassifyImageRequest.alloc().init()
+        requests = [classify]
 
-    aesthetics = None
-    if hasattr(Vision, "VNCalculateImageAestheticsScoresRequest"):  # macOS 15+
-        aesthetics = Vision.VNCalculateImageAestheticsScoresRequest.alloc().init()
-        requests.append(aesthetics)
+        aesthetics = None
+        if hasattr(Vision, "VNCalculateImageAestheticsScoresRequest"):  # macOS 15+
+            aesthetics = Vision.VNCalculateImageAestheticsScoresRequest.alloc().init()
+            requests.append(aesthetics)
 
-    ok, err = handler.performRequests_error_(requests, None)
-    if not ok:
-        raise RuntimeError(str(err))
+        ok, err = handler.performRequests_error_(requests, None)
+        if not ok:
+            raise RuntimeError(str(err))
 
-    labels = []
-    for obs in classify.results() or []:
-        conf = float(obs.confidence())
-        if conf >= min_conf:
-            labels.append((obs.identifier(), conf))
-    labels.sort(key=lambda x: -x[1])
-    labels = labels[:top_n]
+        labels = []
+        for obs in classify.results() or []:
+            conf = float(obs.confidence())
+            if conf >= min_conf:
+                labels.append((str(obs.identifier()), conf))
+        labels.sort(key=lambda x: -x[1])
+        labels = labels[:top_n]
 
-    score = utility = None
-    if aesthetics is not None and aesthetics.results():
-        obs = aesthetics.results()[0]
-        score = float(obs.overallScore())   # -1 ~ 1
-        utility = bool(obs.isUtility())     # 截圖/文件類「工具照」
+        score = utility = None
+        if aesthetics is not None and aesthetics.results():
+            obs = aesthetics.results()[0]
+            score = float(obs.overallScore())   # -1 ~ 1
+            utility = bool(obs.isUtility())     # 截圖/文件類「工具照」
 
+        # 離開 pool 前把 ObjC 物件丟掉，只帶純 Python 值出去
+        del handler, classify, aesthetics, url
     return labels, score, utility
 
 
@@ -244,7 +250,20 @@ def write_tags(path: Path, tags, raw_mode: str, marker: str, stars=None) -> bool
 
 # ---------- main ----------
 
+def raise_fd_limit():
+    """macOS 預設 soft limit 很低（256~4096），拉到 hard limit 以免長批次中途爆掉。"""
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = min(hard, 65536) if hard != resource.RLIM_INFINITY else 65536
+        if soft < target:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+    except Exception:
+        pass
+
+
 def main():
+    raise_fd_limit()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("folder")
     ap.add_argument("--limit", type=int, default=0, help="只處理前 N 張（0=全部）")
