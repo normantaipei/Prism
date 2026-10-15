@@ -1,4 +1,6 @@
-# PhotoAITag
+# Prism
+
+把照片丟進去，分出標籤和評分。
 
 用 macOS 內建 Vision framework 幫 Synology NAS 上的照片自動加標籤。
 零 API 費用，全部在 Mac 本機跑；標籤寫進檔案的 IPTC/XMP 關鍵字，
@@ -14,7 +16,7 @@ NAS (SMB) ──掛載──> Mac ──Vision 分析──> exiftool 寫回 Key
 ## 第一次安裝
 
 ```bash
-cd ~/SideProject/PhotoAITag
+cd ~/SideProject/Prism
 ./setup.sh              # 裝 exiftool、建 .venv、裝 pyobjc
 vim .env                # 確認 NAS IP / 帳號 / 共用路徑
 ```
@@ -60,12 +62,12 @@ password=你的NAS密碼
 
 ```bash
 # 先把 plist 裡的 YOUR_NAME 改成你的使用者名稱
-cp launchd/com.photoaitag.tagger.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.photoaitag.tagger.plist
+cp launchd/com.prism.tagger.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.prism.tagger.plist
 tail -f logs/out.log
 ```
 
-停用：`launchctl unload ~/Library/LaunchAgents/com.photoaitag.tagger.plist`
+停用：`launchctl unload ~/Library/LaunchAgents/com.prism.tagger.plist`
 
 ## 中文標籤
 

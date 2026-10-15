@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.photoaitag.tagger</string>
+  <string>com.prism.tagger</string>
 
   <!-- 改成實際的專案路徑與要掃的資料夾 -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/YOUR_NAME/SideProject/PhotoAITag/run.sh</string>
+    <string>/Users/YOUR_NAME/SideProject/Prism/run.sh</string>
     <string>/Users/YOUR_NAME/mnt/PhotoLibrary</string>
     <string>--write</string>
     <string>--raw-mode</string>
@@ -20,9 +20,9 @@
   <integer>3600</integer>
 
   <key>StandardOutPath</key>
-  <string>/Users/YOUR_NAME/SideProject/PhotoAITag/logs/out.log</string>
+  <string>/Users/YOUR_NAME/SideProject/Prism/logs/out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/YOUR_NAME/SideProject/PhotoAITag/logs/err.log</string>
+  <string>/Users/YOUR_NAME/SideProject/Prism/logs/err.log</string>
 
   <key>EnvironmentVariables</key>
   <dict>

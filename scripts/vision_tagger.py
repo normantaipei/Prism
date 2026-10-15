@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PhotoAITag — 用 macOS Vision framework 幫 NAS 照片加標籤
+Prism — 用 macOS Vision framework 幫 NAS 照片加標籤
 
 預設只印出分析結果，不動檔案。加 --write 才會用 exiftool 寫入
 IPTC:Keywords + XMP-dc:Subject（Synology Photos 會自動索引這兩個欄位）。
