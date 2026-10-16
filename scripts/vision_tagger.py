@@ -237,7 +237,8 @@ def write_tags(path: Path, tags, raw_mode: str, marker: str, stars=None, fill_da
     kw = list(tags) + ([marker] if marker else [])
     # -overwrite_original_in_place：原地覆寫，不走「暫存檔再改名」，保住檔案建立時間
     # -P：保留修改時間
-    args = ["exiftool", "-overwrite_original_in_place", "-charset", "iptc=UTF8", "-P"]
+    args = ["exiftool", "-overwrite_original_in_place", "-charset", "iptc=UTF8", "-P",
+            "-api", "NoDups=1"]  # 重跑時不讓同一關鍵字重複（需 exiftool >= 12.35）
     if fill_date:
         # 截圖、通訊軟體存圖等沒有 EXIF 拍攝日期的檔案，Synology Photos 會退而用檔案時間，
         # 一旦檔案被重寫時間軸就跑掉。把原本的修改時間寫進 metadata，日期就跟著檔案走了。
