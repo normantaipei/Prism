@@ -213,17 +213,36 @@ def score_to_stars(score, thresholds):
     return stars
 
 
-def existing_rating(path: Path):
-    r = subprocess.run(["exiftool", "-s3", "-XMP:Rating", str(path)], capture_output=True, text=True)
-    v = r.stdout.strip()
-    return int(float(v)) if v else None
+def read_meta(path: Path) -> dict:
+    """一次讀出寫入前要知道的欄位：既有星等、有沒有拍攝日期。"""
+    r = subprocess.run(
+        ["exiftool", "-s3", "-f", "-XMP:Rating", "-EXIF:DateTimeOriginal", "-EXIF:CreateDate",
+         "-XMP:CreateDate", "-XMP:DateCreated", "-QuickTime:CreateDate", str(path)],
+        capture_output=True, text=True)
+    vals = [v.strip() for v in r.stdout.splitlines()]
+    vals += ["-"] * (6 - len(vals))
+    rating = None
+    if vals[0] not in ("-", ""):
+        try:
+            rating = int(float(vals[0]))
+        except ValueError:
+            pass
+    has_date = any(v not in ("-", "", "0000:00:00 00:00:00") for v in vals[1:])
+    return {"rating": rating, "has_date": has_date}
 
 
 # ---------- 寫入 ----------
 
-def write_tags(path: Path, tags, raw_mode: str, marker: str, stars=None) -> bool:
+def write_tags(path: Path, tags, raw_mode: str, marker: str, stars=None, fill_date=False) -> bool:
     kw = list(tags) + ([marker] if marker else [])
-    args = ["exiftool", "-overwrite_original", "-charset", "iptc=UTF8", "-P"]  # -P 保留原檔日期
+    # -overwrite_original_in_place：原地覆寫，不走「暫存檔再改名」，保住檔案建立時間
+    # -P：保留修改時間
+    args = ["exiftool", "-overwrite_original_in_place", "-charset", "iptc=UTF8", "-P"]
+    if fill_date:
+        # 截圖、通訊軟體存圖等沒有 EXIF 拍攝日期的檔案，Synology Photos 會退而用檔案時間，
+        # 一旦檔案被重寫時間軸就跑掉。把原本的修改時間寫進 metadata，日期就跟著檔案走了。
+        args += ["-EXIF:DateTimeOriginal<FileModifyDate", "-EXIF:CreateDate<FileModifyDate",
+                 "-XMP:CreateDate<FileModifyDate", "-XMP:DateCreated<FileModifyDate"]
     for t in kw:
         args += [f"-IPTC:Keywords+={t}", f"-XMP-dc:Subject+={t}"]
     if stars is not None:
@@ -349,14 +368,18 @@ def main():
                 print("    (沒有超過門檻的標籤，試試 --min-conf 0.1)")
 
         stars = None
-        if args.write and args.rating and score is not None:
-            if args.rating_overwrite or existing_rating(p) in (None, 0):
+        fill_date = False
+        if args.write:
+            meta = read_meta(p)
+            fill_date = not meta["has_date"]
+            if args.rating and score is not None and (args.rating_overwrite or meta["rating"] in (None, 0)):
                 stars = score_to_stars(score, thresholds)
         written = False
-        if args.write and (tags or stars is not None):
-            written = write_tags(p, tags, args.raw_mode, args.marker, stars)
+        if args.write and (tags or stars is not None or fill_date):
+            written = write_tags(p, tags, args.raw_mode, args.marker, stars, fill_date)
             if not args.json:
-                print("    -> 已寫入" if written else "    -> 寫入失敗")
+                note = "  (補上拍攝日期)" if fill_date else ""
+                print(("    -> 已寫入" + note) if written else "    -> 寫入失敗")
         db_mark(con, p, tags, score, written)
 
     if args.json:

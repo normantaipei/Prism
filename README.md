@@ -97,10 +97,16 @@ Vision 的 `VNCalculateImageAestheticsScoresRequest`（macOS 15+）會給 -1 ~ +
 先用 `scripts/score_histogram.py` 看自己照片的分布再決定門檻；實測 cos 棚拍大多落在 +0.3 ~ +0.7，
 失焦／誤觸的廢片會掉到 0 以下，所以 `0,0.4,0.55,0.7` 是個合理的起點。
 
+## 沒有拍攝日期的檔案（截圖、通訊軟體存圖）
+
+這類檔案沒有 EXIF 日期，Synology Photos 只能用檔案時間排時間軸，檔案一被改寫日期就會跑掉。
+Prism 寫入時會偵測並把原本的修改時間補進 `DateTimeOriginal`，讓日期跟著 metadata 走。
+已經跑掉的用 `python scripts/fix_dates.py <資料夾> --write` 一次補回（只動日期，不重跑 Vision）。
+
 ## 注意
 
 - `@eaDir`（Synology 縮圖）會自動排除。
-- `--write` 會用 `-overwrite_original`，不留 `_original` 備份；第一次請先在小資料夾測。
+- `--write` 會原地覆寫、不留 `_original` 備份；第一次請先在小資料夾測。
 - `-P` 會保留檔案原本的修改日期，所以 Synology Photos 的時間軸不會跑掉。
 - Vision 的標籤是通用詞彙（person / costume / indoor…），角色、coser、活動名這類標籤
   需另外從資料夾名或對照表補，或接本機 VLM（Ollama + Qwen2-VL）。
