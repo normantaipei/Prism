@@ -67,6 +67,7 @@ password=你的NAS密碼
 | `--rating-thresholds a,b,c,d` | 四個門檻切 1~5 星，先用 `scripts/score_histogram.py` 看分布再調 |
 | `--lang both/zh/en` | 標籤語言，預設中英都寫（Synology Photos 搜尋只比對標籤文字，英文標籤搜中文找不到） |
 | `--marker AI_VISION` | 額外加一個標記 tag，在 Synology Photos 搜這個就能看到哪些跑過了 |
+| `--shard I/N` | 多台機器分工：這台只處理第 I 片（0 起算），共 N 片 |
 | `--force` | 忽略 state.db 重跑 |
 | `--json` | 機器可讀輸出 |
 
@@ -96,6 +97,17 @@ Vision 的 `VNCalculateImageAestheticsScoresRequest`（macOS 15+）會給 -1 ~ +
 加 `--rating` 會依門檻切成 1~5 星寫進 `XMP:Rating`，Synology Photos 索引後可用「評分」篩選或建條件相簿。
 先用 `scripts/score_histogram.py` 看自己照片的分布再決定門檻；實測 cos 棚拍大多落在 +0.3 ~ +0.7，
 失焦／誤觸的廢片會掉到 0 以下，所以 `0,0.4,0.55,0.7` 是個合理的起點。
+
+## 多台 Mac 一起跑
+
+每台給一個分片編號，用檔名 hash 切分，互不重疊、不需要共享狀態（同名 JPG/RAW 保證落在同一台）：
+
+```bash
+# 機器 A                                  # 機器 B
+./run.sh <資料夾> --write --shard 0/2      ./run.sh <資料夾> --write --shard 1/2
+```
+
+三台就 `0/3`、`1/3`、`2/3`。瓶頸最終會落在 NAS 的 SMB 與硬碟，機器加到一定數量就不再變快。
 
 ## 沒有拍攝日期的檔案（截圖、通訊軟體存圖）
 

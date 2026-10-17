@@ -301,6 +301,8 @@ def main():
                     help="四個分數門檻切出 1~5 星，預設 %(default)s")
     ap.add_argument("--lang", choices=["both", "zh", "en"], default="both",
                     help="標籤語言：both 中英都寫（預設）/ zh 只中文 / en 只英文")
+    ap.add_argument("--shard", default=None, metavar="I/N",
+                    help="多台機器分工：只處理第 I 片（0 起算），共 N 片。例：--shard 0/2 和 --shard 1/2 兩台各跑一半")
     ap.add_argument("--force", action="store_true", help="忽略 state.db，全部重跑")
     ap.add_argument("--json", action="store_true", help="JSON 輸出")
     args = ap.parse_args()
@@ -308,6 +310,14 @@ def main():
     root = Path(args.folder).expanduser()
     if not root.is_dir():
         sys.exit(f"找不到資料夾: {root}")
+
+    shard_i = shard_n = None
+    if args.shard:
+        try:
+            shard_i, shard_n = (int(x) for x in args.shard.split("/"))
+            assert 0 <= shard_i < shard_n
+        except (ValueError, AssertionError):
+            sys.exit("--shard 格式是 I/N，例如 0/2、1/2")
 
     thresholds = sorted(float(x) for x in args.rating_thresholds.split(","))
     if len(thresholds) != 4:
@@ -317,14 +327,26 @@ def main():
     tag_map = load_tag_map()
     missing_zh = set()
     mode = "（會寫入）" if args.write else "（只印出）"
+    if shard_n:
+        mode += f"，分片 {shard_i}/{shard_n}"
     print(f"開始掃描 {root} {mode}，邊掃邊處理…\n", file=sys.stderr)
+
+    def in_my_shard(p: Path) -> bool:
+        """用「不含副檔名的路徑」做 hash，讓同名 JPG/RAW 一定落在同一台，sidecar 不會衝突。"""
+        if shard_n is None:
+            return True
+        key = str(p.with_suffix("")).encode("utf-8")
+        return int(hashlib.md5(key).hexdigest(), 16) % shard_n == shard_i
 
     def pending():
         """串流產生要處理的檔案，順便印掃描進度。"""
-        seen = skipped = 0
+        seen = skipped = other = 0
         last = time.time()
         for p, st in iter_images(root):
             seen += 1
+            if not in_my_shard(p):
+                other += 1
+                continue
             if not args.force and db_seen(con, p, written_only=args.write, st=st):
                 skipped += 1
                 if time.time() - last > 2:
@@ -332,8 +354,9 @@ def main():
                     last = time.time()
                 continue
             yield p
-        if skipped:
-            print(f"\n掃描完成：共 {seen} 張，跳過 {skipped} 張已處理", file=sys.stderr)
+        if skipped or other:
+            extra = f"，{other} 張屬於其他分片" if other else ""
+            print(f"\n掃描完成：共 {seen} 張，跳過 {skipped} 張已處理{extra}", file=sys.stderr)
 
     files = pending()
     if args.limit:
