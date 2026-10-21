@@ -64,7 +64,7 @@ password=你的NAS密碼
 | `--raw-mode none/embed/sidecar` | 同名 RAW 怎麼處理 |
 | `--rating` | 把美學分數寫成 `XMP:Rating`（Synology Photos 的星星），預設不覆蓋已有評分 |
 | `--rating-overwrite` | 已有星等也覆蓋 |
-| `--rating-thresholds a,b,c,d` | 四個門檻切 1~5 星，先用 `scripts/score_histogram.py` 看分布再調 |
+| `--rating-thresholds a,b,c,d` | 四個門檻切 1~5 星，預設 `0,0.4,0.55,0.7`；先用 `scripts/score_histogram.py` 看分布再調 |
 | `--lang both/zh/en` | 標籤語言，預設中英都寫（Synology Photos 搜尋只比對標籤文字，英文標籤搜中文找不到） |
 | `--marker AI_VISION` | 額外加一個標記 tag，在 Synology Photos 搜這個就能看到哪些跑過了 |
 | `--shard I/N` | 多台機器分工：這台只處理第 I 片（0 起算），共 N 片 |
@@ -96,7 +96,7 @@ Synology Photos 的搜尋只比對標籤文字，英文標籤搜中文找不到�
 Vision 的 `VNCalculateImageAestheticsScoresRequest`（macOS 15+）會給 -1 ~ +1 的分數。
 加 `--rating` 會依門檻切成 1~5 星寫進 `XMP:Rating`，Synology Photos 索引後可用「評分」篩選或建條件相簿。
 先用 `scripts/score_histogram.py` 看自己照片的分布再決定門檻；實測 cos 棚拍大多落在 +0.3 ~ +0.7，
-失焦／誤觸的廢片會掉到 0 以下，所以 `0,0.4,0.55,0.7` 是個合理的起點。
+失焦／誤觸的廢片會掉到 0 以下，所以預設門檻是 `0,0.4,0.55,0.7`（不加 `--rating-thresholds` 就用這組）。
 
 ## 多台 Mac 一起跑
 

@@ -11,7 +11,7 @@ rows = [r[0] for r in sqlite3.connect(root / "state.db").execute(
 if not rows:
     sys.exit("state.db 還沒有分數")
 
-th = [float(x) for x in (sys.argv[1] if len(sys.argv) > 1 else "-0.4,-0.1,0.2,0.5").split(",")]
+th = [float(x) for x in (sys.argv[1] if len(sys.argv) > 1 else "0,0.4,0.55,0.7").split(",")]
 rows.sort()
 n = len(rows)
 print(f"{n} 張  最低 {rows[0]:+.2f}  中位 {rows[n//2]:+.2f}  最高 {rows[-1]:+.2f}\n")

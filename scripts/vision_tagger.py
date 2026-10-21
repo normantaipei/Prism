@@ -201,7 +201,8 @@ def localize(tags, tag_map, lang: str, missing: set):
 # ---------- 美學 → 星等 ----------
 
 # Vision overallScore 範圍 -1 ~ +1。門檻可用 --rating-thresholds 調整。
-DEFAULT_THRESHOLDS = [-0.4, -0.1, 0.2, 0.5]   # 低於 t0 → 1星, t0~t1 → 2星, ... 高於 t3 → 5星
+# 預設門檻：實測 cos / 人像多落在 +0.3 ~ +0.7、廢片掉到 0 以下，用這組分得最開
+DEFAULT_THRESHOLDS = [0, 0.4, 0.55, 0.7]   # 低於 t0 → 1星, t0~t1 → 2星, ... 高於 t3 → 5星
 
 def score_to_stars(score, thresholds):
     if score is None:
